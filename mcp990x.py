@@ -1,4 +1,4 @@
-# sensor.py - driver class for the I2C based Atmel at30ts00 temperature sensor
+# mcp990x.py - driver class for the I2C based Microchip MCP990x temperature sensors family
 
 """This module allows driving the I2C temp sensor"""
 import smbus
@@ -9,23 +9,14 @@ class Sensor(object):
     Return a new Sensor object that is connected to the
     specified I2C device interface.
     """
-    REG_ADDR_CAPABILITY = 0x00
-    REG_ADDR_CONFIGURATION = 0x01
-    REG_ADDR_UPPERALARM = 0x02
-    REG_ADDR_LOWERALARM = 0x03
-    REG_ADDR_CRITICALALRAM = 0x04
-    REG_ADDR_TEMP = 0x05
-    REG_ADDR_MANUF_ID = 0x06
-    REG_ADDR_DEV_ID = 0x07
-    REG_ADDR_RESERVED1 = tuple(range(0x08, 0x22))
-    REG_ADDR_SMBUS = 0x22
-    REG_ADDR_RESERVED2 = tuple(range(0x23, 0xFF))
-    REG_ADDR_LAST = REG_ADDR_DEV_ID
-    _bus = -1
+    REG_ADDR_TEMP_HIGH = 0x00
+    REG_ADDR_TEMP_LOW = 0x29
+    REG_ADDR_LAST = 0xFF
+    _bus = None
     _debug = False
-    _i2c_addr = 0b0011011
+    _i2c_addr = 0b1001100
 
-    def __init__(self, bus=0, debug=False, i2c_addr=0b0011011):
+    def __init__(self, bus=0, debug=False, i2c_addr=0b1001100):
         # 0 = /dev/i2c-0 (port I2C0), 1 = /dev/i2c-1 (port I2C1), etc
         self._bus = smbus.SMBus(bus)
         self._debug = debug
@@ -36,47 +27,47 @@ class Sensor(object):
         Disconnects the object from the bus.
         """
         self._bus.close()
-        self._bus = -1
+        self._bus = None
 
     def __write_register(self, reg_addr, values):
-        """ this writes a 16 bit register pointed to by reg_addr.
+        """ this writes a 8 bit register pointed to by reg_addr.
         """
+        if self._bus is None:
+            raise IOError("Bus not open")
         if reg_addr > self.REG_ADDR_LAST:
             raise IOError("Invalid register address {0}".format(reg_addr))
-        if len(values) > 2:
+        if len(values) > 1:
             raise IOError("Invalid data length {0}".format(len(values)))
 
         self._bus.write_i2c_block_data(self._i2c_addr, reg_addr, values)
 
     def __read_register(self, reg_addr):
-        """ this reads a 16 bit register pointed to by reg_addr
+        """ this reads a 8 bit register pointed to by reg_addr
         """
+        if self._bus is None:
+            raise IOError("Bus not open")
         if reg_addr > self.REG_ADDR_LAST:
             raise IOError("Invalid register address {0}".format(reg_addr))
 
-        return self._bus.read_word_data(self._i2c_addr, reg_addr)
+        return self._bus.read_byte_data(self._i2c_addr, reg_addr)
 
     def read(self):
         """read()
         read the current temperature
         """
-        raw_temp_reg = self.__read_register(self.REG_ADDR_TEMP)
+        raw_temp_reg_low = self.__read_register(self.REG_ADDR_TEMP_LOW)
+        raw_temp_reg_high = self.__read_register(self.REG_ADDR_TEMP_HIGH)
 
-        # invert the endianness
-        raw_temp_reg = ((raw_temp_reg >> 8)&0xff) | ((raw_temp_reg << 8)&0xff00)
+        # stitch together the temp reading bytes: the total data is 11 bits,
+        # with the most significant 8 in the high reg and the least significant 3
+        # in the top 3 bits of the low reg. So, OR them together as a 17 bits integer,
+        # then shift everything right by 5
+        raw_temp_reg = ((raw_temp_reg_high << 8) | raw_temp_reg_low) >> 5
         if self._debug:
             print("reg: " + hex(raw_temp_reg))
 
-        temp = raw_temp_reg & 0xFFF
+        temp = raw_temp_reg * 0.125
         if self._debug:
             print(str(temp))
-        temp /= 16.0
-        if self._debug:
-            print(str(temp))
-
-        if raw_temp_reg & (1 << 12):
-            temp *= -1.0
-            if self._debug:
-                print(str(temp))
 
         return temp
