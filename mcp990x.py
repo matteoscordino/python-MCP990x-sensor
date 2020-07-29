@@ -16,9 +16,16 @@ class Sensor(object):
     _debug = False
     _i2c_addr = 0b1001100
 
-    def __init__(self, bus=0, debug=False, i2c_addr=0b1001100):
+    def __init__(self, bus=0,  preinited_bus=None, debug=False, i2c_addr=0b1001100):
         # 0 = /dev/i2c-0 (port I2C0), 1 = /dev/i2c-1 (port I2C1), etc
-        self._bus = smbus.SMBus(bus)
+        if preinited_bus is not None:
+            if debug:
+                print("using preinited-bus, address {0}".format(address))
+            self._bus = preinited_bus
+        else:
+            if debug:
+                print("init-ing bus {0}, address {1}".format(bus, address))
+            self._bus = smbus.SMBus(bus)
         self._debug = debug
         self._i2c_addr = i2c_addr
 
