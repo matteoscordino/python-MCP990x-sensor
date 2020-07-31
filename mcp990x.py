@@ -20,11 +20,11 @@ class Sensor(object):
         # 0 = /dev/i2c-0 (port I2C0), 1 = /dev/i2c-1 (port I2C1), etc
         if preinited_bus is not None:
             if debug:
-                print("using preinited-bus, address {0}".format(address))
+                print("using preinited-bus, address {0}".format(i2c_addr))
             self._bus = preinited_bus
         else:
             if debug:
-                print("init-ing bus {0}, address {1}".format(bus, address))
+                print("init-ing bus {0}, address {1}".format(bus, i2c_addr))
             self._bus = smbus.SMBus(bus)
         self._debug = debug
         self._i2c_addr = i2c_addr
